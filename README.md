@@ -77,4 +77,4 @@ kind delete clusters dev prod
 
 ## Author
 
-Jamil Qarahmadov — DevSecOps Engineer · cemil.qarahmedov@gmail.com
+Jamil Qarahmadov — DevSecOps Engineer · [LinkedIn](https://www.linkedin.com/in/cemil-qarahmedov-0507b4211/) · cemil.qarahmedov@gmail.com
