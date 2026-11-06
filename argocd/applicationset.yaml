@@ -1,0 +1,53 @@
+# One template, one Application per environment.
+#   dev  -> auto-sync with self-heal: Git is applied as soon as it changes,
+#           and any manual change in the cluster is reverted.
+#   prod -> manual sync: drift is detected and reported, but only a release
+#           manager can apply changes.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: task-platform
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - list:
+        elements:
+          - env: dev
+            cluster: in-cluster
+            autoSync: "true"
+            revision: main
+          - env: prod
+            cluster: prod
+            autoSync: "false"
+            revision: main
+  template:
+    metadata:
+      name: "task-platform-{{ .env }}"
+      labels:
+        environment: "{{ .env }}"
+    spec:
+      project: platform
+      source:
+        repoURL: https://github.com/jaymeeljr/gitops-multicluster.git
+        targetRevision: "{{ .revision }}"
+        path: "apps/task-platform/overlays/{{ .env }}"
+      destination:
+        name: "{{ .cluster }}"
+        namespace: task-platform
+      syncPolicy:
+        syncOptions:
+          - CreateNamespace=false   # namespaces are owned by the platform team
+          - PrunePropagationPolicy=foreground
+        retry:
+          limit: 3
+          backoff: { duration: 10s, factor: 2, maxDuration: 2m }
+  templatePatch: |
+    {{- if eq .autoSync "true" }}
+    spec:
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+    {{- end }}

@@ -1,0 +1,16 @@
+# Dev: one replica of everything, image tracks the latest build.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+labels:
+  - pairs:
+      environment: dev
+images:
+  - name: task-api
+    newTag: dev
+replicas:
+  - name: api
+    count: 1
+  - name: frontend
+    count: 1

@@ -1,0 +1,64 @@
+# Identity Argo CD uses to manage the PROD cluster.
+# The usual `argocd cluster add` grants cluster-admin. Here Argo CD gets a
+# Role limited to the task-platform namespace and to the object kinds the
+# AppProject allows: if Argo CD (or its credentials) were compromised, the
+# blast radius is one namespace, not the whole cluster.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: argocd-access
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-manager
+  namespace: argocd-access
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-manager-token
+  namespace: argocd-access
+  annotations:
+    kubernetes.io/service-account.name: argocd-manager
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-deployer
+  namespace: task-platform
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Read-only visibility so Argo CD can report health.
+  - apiGroups: [""]
+    resources: ["pods", "events", "endpoints", "resourcequotas", "limitranges"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-deployer
+  namespace: task-platform
+subjects:
+  - kind: ServiceAccount
+    name: argocd-manager
+    namespace: argocd-access
+roleRef:
+  kind: Role
+  name: argocd-deployer
+  apiGroup: rbac.authorization.k8s.io

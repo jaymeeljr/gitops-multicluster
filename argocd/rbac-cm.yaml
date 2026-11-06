@@ -1,0 +1,26 @@
+# Who can do what in Argo CD. Everyone is read-only by default.
+# Groups come from the identity provider (SSO) in a real setup.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  policy.default: role:readonly
+  policy.csv: |
+    # Developers: see everything in the project, deploy to dev only.
+    p, role:developer, applications, get, platform/*, allow
+    p, role:developer, applications, sync, platform/task-platform-dev, allow
+    p, role:developer, logs, get, platform/*, allow
+
+    # Release managers: deploy to prod. Still cannot delete apps or exec.
+    p, role:release-manager, applications, get, platform/*, allow
+    p, role:release-manager, applications, sync, platform/*, allow
+    p, role:release-manager, logs, get, platform/*, allow
+
+    # Nobody except admin may exec into pods or change projects/clusters.
+    g, platform-developers, role:developer
+    g, release-managers, role:release-manager

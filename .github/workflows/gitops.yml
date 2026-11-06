@@ -1,0 +1,117 @@
+name: GitOps Multi-Cluster
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ARGOCD_VERSION: v3.6.1
+  KUSTOMIZE_VERSION: v5.8.3
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  # ------------------------------------------------------------------
+  # Static: what Argo CD would apply must be valid and secure
+  # ------------------------------------------------------------------
+  static:
+    name: Render, validate, scan, RBAC policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install tools
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | tar xz kustomize
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar xz kubeconform
+          curl -sSL -o argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
+          curl -sSL https://github.com/open-policy-agent/conftest/releases/download/v0.62.0/conftest_0.62.0_Linux_x86_64.tar.gz | tar xz conftest
+          chmod +x kustomize kubeconform argocd conftest
+          sudo mv kustomize kubeconform argocd conftest /usr/local/bin/
+          pip install checkov==3.2.469
+
+      - name: Render each environment exactly as Argo CD will
+        run: |
+          mkdir -p rendered
+          for env in dev prod; do kustomize build "apps/task-platform/overlays/$env" > "rendered/$env.yaml"; done
+
+      - name: Schema validation (kubeconform)
+        run: |
+          kubeconform -strict -summary -kubernetes-version 1.34.0 rendered/ bootstrap/
+          kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            argocd/
+
+      - name: Checkov
+        run: |
+          checkov -d rendered --framework kubernetes --compact --quiet
+          checkov -d bootstrap --framework kubernetes --compact --quiet
+
+      - name: OPA policies
+        run: |
+          conftest verify --policy policy/
+          conftest test rendered/ --policy policy/
+
+      - name: Argo CD RBAC policy
+        run: bash tests/test-rbac-policy.sh
+
+      - name: ShellCheck
+        run: shellcheck -x scripts/*.sh tests/*.sh
+
+  # ------------------------------------------------------------------
+  # End-to-end: two clusters, Argo CD, real deployments and misuse
+  # ------------------------------------------------------------------
+  e2e:
+    name: Two clusters with Argo CD (kind)
+    runs-on: ubuntu-latest
+    needs: static
+    timeout-minutes: 35
+    env:
+      REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out the API from secure-cicd-pipeline
+        uses: actions/checkout@v5
+        with:
+          repository: jaymeeljr/secure-cicd-pipeline
+          path: api-src
+
+      - name: Install kind
+        uses: helm/kind-action@v1.15.2
+        with:
+          version: v0.30.0
+          install_only: true
+
+      - name: Bootstrap dev + prod clusters and Argo CD
+        run: ./scripts/bootstrap.sh api-src "$REVISION"
+
+      - name: Test Argo CD's access to prod is least-privilege
+        run: bash tests/test-prod-access.sh
+
+      - name: Test delivery (dev auto, prod manual)
+        run: bash tests/test-sync.sh
+
+      - name: Test drift detection and self-heal
+        run: bash tests/test-drift.sh
+
+      - name: Test AppProject guardrails
+        run: bash tests/test-guardrails.sh
+
+      - name: Debug info on failure
+        if: failure()
+        run: |
+          kubectl --context kind-dev -n argocd get applications -o wide || true
+          kubectl --context kind-dev -n argocd get applications -o yaml | grep -A12 -E "conditions:|operationState:" | head -n 120 || true
+          kubectl --context kind-dev -n argocd logs statefulset/argocd-application-controller --tail=60 || true
+          kubectl --context kind-prod -n task-platform get all || true

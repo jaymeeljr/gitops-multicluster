@@ -1,0 +1,19 @@
+# Deliberately forbidden objects used by tests/test-guardrails.sh.
+# The AppProject must refuse to apply them.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: guardrail-escalation
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: guardrail-secret
+  namespace: task-platform
+type: Opaque
+stringData:
+  note: test fixture, not a real credential

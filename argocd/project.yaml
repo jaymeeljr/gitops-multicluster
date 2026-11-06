@@ -1,0 +1,40 @@
+# Guardrails for every application the platform team runs.
+# Even with write access to Git, nobody can use this project to deploy from
+# another repository, into another namespace, or create cluster-wide objects.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Task platform workloads (dev and prod)
+
+  sourceRepos:
+    - https://github.com/jaymeeljr/gitops-multicluster.git
+
+  destinations:
+    - name: in-cluster
+      namespace: task-platform
+    - name: prod
+      namespace: task-platform
+
+  # No cluster-scoped resources at all (no ClusterRoles, CRDs, Namespaces...).
+  clusterResourceWhitelist: []
+
+  # Only the object kinds the app actually needs. Quotas, RBAC and Secrets
+  # belong to the platform team and are managed outside this project.
+  namespaceResourceWhitelist:
+    - { group: apps, kind: Deployment }
+    - { group: "", kind: Service }
+    - { group: "", kind: ConfigMap }
+    - { group: "", kind: ServiceAccount }
+    - { group: networking.k8s.io, kind: NetworkPolicy }
+    - { group: policy, kind: PodDisruptionBudget }
+
+  # Production changes are blocked on weekdays 22:00-06:00 UTC unless manual.
+  syncWindows:
+    - kind: deny
+      schedule: "0 22 * * 1-5"
+      duration: 8h
+      applications: ["task-platform-prod"]
+      manualSync: true
