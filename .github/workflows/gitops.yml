@@ -31,18 +31,17 @@ jobs:
 
       - name: Install tools
         run: |
-          # Download to files first: piping into `tar` that extracts one member
-          # closes the pipe early and makes curl fail under pipefail.
           curl -sSLo kustomize.tgz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
           curl -sSLo kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
           curl -sSLo conftest.tgz https://github.com/open-policy-agent/conftest/releases/download/v0.62.0/conftest_0.62.0_Linux_x86_64.tar.gz
-          curl -sSLo argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
+          curl -sSLo argocd-cli "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
           tar xzf kustomize.tgz kustomize
           tar xzf kubeconform.tgz kubeconform
           tar xzf conftest.tgz conftest
           rm -f ./*.tgz
-          chmod +x kustomize kubeconform argocd conftest
-          sudo mv kustomize kubeconform argocd conftest /usr/local/bin/
+          chmod +x kustomize kubeconform argocd-cli conftest
+          sudo mv argocd-cli /usr/local/bin/argocd
+          sudo mv kustomize kubeconform conftest /usr/local/bin/
           pip install checkov==3.2.469
 
       - name: Render each environment exactly as Argo CD will
