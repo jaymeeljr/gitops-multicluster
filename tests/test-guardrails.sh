@@ -27,7 +27,7 @@ EOF
 
 refused() {  # the app carries an error from the project's rules
   kubectl --context "$DEV" -n argocd get application "$1" -o yaml \
-    | grep -Eiq "not permitted|do not match|not allowed"
+    | grep -Eiq "not permitted|do not match|not allowed|excluded"
 }
 
 REPO=https://github.com/jaymeeljr/gitops-multicluster.git

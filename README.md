@@ -28,7 +28,6 @@ flowchart LR
 | Manual `kubectl` change | Reverted by self-heal | Flagged as drift (OutOfSync), not overwritten |
 | Image | `task-api:dev` | `task-api:release-1` (promote by editing the tag in a PR) |
 | Shape | 1 replica | 3 replicas + PodDisruptionBudget |
-| Change window | Any time | Automatic changes denied weekdays 22:00–06:00 UTC |
 
 Both environments come from one [`ApplicationSet`](argocd/applicationset.yaml) and one Kustomize base with [`dev`](apps/task-platform/overlays/dev) and [`prod`](apps/task-platform/overlays/prod) overlays.
 
@@ -41,6 +40,8 @@ Both environments come from one [`ApplicationSet`](argocd/applicationset.yaml) a
 - one destination namespace per cluster
 - zero cluster-scoped resources; only Deployments, Services, ConfigMaps, ServiceAccounts, NetworkPolicies and PDBs
 - Secrets, RBAC and quotas stay with the platform team ([`bootstrap/`](bootstrap/))
+
+**Argo CD watches only what it manages** ([`argocd/argocd-cm.yaml`](argocd/argocd-cm.yaml)). The first CI run failed because Argo CD tries to list every resource type in a namespace, including Secrets, and the minimal prod Role denied it. Instead of widening the Role, Argo CD's resource inclusions were narrowed to the kinds the platform manages.
 
 **Argo CD RBAC** ([`argocd/rbac-cm.yaml`](argocd/rbac-cm.yaml)): read-only by default; developers sync dev only; release managers sync prod; nobody but admin can delete apps, exec into pods or edit projects.
 

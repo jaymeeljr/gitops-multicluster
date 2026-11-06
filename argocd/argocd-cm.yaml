@@ -1,0 +1,29 @@
+# Argo CD watches only the resource kinds this platform manages.
+# Without this, Argo CD lists every resource type in a namespace (Secrets,
+# PVCs, PodTemplates...) and would need far wider permissions on prod.
+# Narrowing what Argo CD watches lets the prod credentials stay minimal.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  resource.inclusions: |
+    - apiGroups: ["apps"]
+      kinds: ["Deployment", "ReplicaSet"]
+      clusters: ["*"]
+    - apiGroups: [""]
+      kinds: ["Service", "ConfigMap", "ServiceAccount", "Pod", "Endpoints"]
+      clusters: ["*"]
+    - apiGroups: ["networking.k8s.io"]
+      kinds: ["NetworkPolicy"]
+      clusters: ["*"]
+    - apiGroups: ["policy"]
+      kinds: ["PodDisruptionBudget"]
+      clusters: ["*"]
+    - apiGroups: ["discovery.k8s.io"]
+      kinds: ["EndpointSlice"]
+      clusters: ["*"]

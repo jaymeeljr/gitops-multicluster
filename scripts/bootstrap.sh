@@ -34,7 +34,7 @@ echo "==> Argo CD ${ARGOCD_VERSION} on the dev (management) cluster"
 kubectl --context "$DEV" create namespace argocd --dry-run=client -o yaml | kubectl --context "$DEV" apply -f -
 kubectl --context "$DEV" apply -n argocd --server-side --force-conflicts \
   -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
-kubectl --context "$DEV" apply --server-side --force-conflicts -f argocd/rbac-cm.yaml
+kubectl --context "$DEV" apply --server-side --force-conflicts -f argocd/rbac-cm.yaml -f argocd/argocd-cm.yaml
 for d in argocd-server argocd-repo-server argocd-applicationset-controller; do
   kubectl --context "$DEV" -n argocd rollout status "deployment/$d" --timeout=300s
 done

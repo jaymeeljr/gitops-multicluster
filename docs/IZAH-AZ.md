@@ -26,13 +26,15 @@
 
 **PodDisruptionBudget (PDB)** — node yenilənəndə və ya söndürüləndə eyni anda neçə pod-un dayana biləcəyini məhdudlaşdırır. Prod-da həmişə ən azı 2 API pod-u işləyir.
 
-**Sync window** — prod-da hansı saatlarda avtomatik dəyişikliyə icazə olmadığını təyin edir (gecə saatları).
-
 ## Təhlükəsizlik baxımından ən vacib iki məqam
 
 1. **Argo CD prod-da cluster-admin deyil.** Standart qurulumda Argo CD-yə hər şeyə icazə verilir. Biz ona yalnız bir namespace-də, yalnız lazım olan obyekt növləri üçün icazə verdik. Test bunu yoxlayır: Argo CD-nin açarı ilə secret oxumaq, `kube-system`-ə girmək, ClusterRoleBinding yaratmaq mümkün deyil. Argo CD ələ keçirilsə, zərər bir namespace ilə məhdud qalır.
 
 2. **Guardrail testləri.** Bilərəkdən "pis" Application-lar yaradırıq: `kube-system`-ə deploy, naməlum repo-dan deploy, içində ClusterRole və Secret olan tətbiq. Argo CD hamısını rədd edir və klasterdə heç nə yaranmır.
+
+## Yol boyu tapılan problem
+
+Birinci CI işində prod sinxronlaşmadı. Səbəb: Argo CD namespace-dəki bütün resurs növlərini (Secret, PVC və s.) siyahılamağa çalışır, bizim sıx icazələr isə buna imkan vermirdi. İcazələri genişləndirmək asan yol olardı, amma təhlükəsizliyi zəiflədərdi. Bunun əvəzinə Argo CD-yə yalnız idarə etdiyimiz növləri izləməyi dedik (`resource.inclusions`). Müsahibədə "least privilege-i saxlamaq üçün nə vaxtsa çətinliklə üzləşmisən?" sualına yaxşı cavabdır.
 
 ## Ehtimal olunan suallar
 
